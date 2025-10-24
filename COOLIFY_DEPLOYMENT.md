@@ -43,15 +43,19 @@ healthcheck:
    - Verbinde dein Git-Repository
 
 2. **Umgebungsvariablen konfigurieren** (optional)
+
+   Für eine Standard-Installation sind **keine** Umgebungsvariablen erforderlich.
+
+   Falls Du die App anpassen möchtest, siehe die detaillierte Dokumentation:
+   **[COOLIFY_ENV_VARS.md](./COOLIFY_ENV_VARS.md)** - Komplette Anleitung zu allen ENV-Variablen
+
+   Quick-Beispiel für häufige Anpassungen:
    ```bash
-   BASE_PATH=/                    # Standard: /
-   HIDE_CREDITS=false            # Credits anzeigen
-   DEFAULT_PRESET=               # Standard-Preset
-   DEFAULT_DATA=                 # Standard-Daten für QR-Code
-   PRESETS=                      # QR-Code-Presets (JSON)
-   FRAME_PRESET=                 # Frame-Preset
-   FRAME_PRESETS=                # Frame-Presets (JSON)
-   DISABLE_LOCAL_STORAGE=false   # LocalStorage deaktivieren
+   BASE_PATH=/                    # Standard: / (Root-Pfad)
+   HIDE_CREDITS=false            # Credits anzeigen (true = ausblenden)
+   DEFAULT_PRESET=plain          # Welcher Preset beim Start geladen wird
+   DEFAULT_DATA=                 # Vorausgefüllter Text/URL (optional)
+   DISABLE_LOCAL_STORAGE=false   # LocalStorage aktivieren
    ```
 
 3. **Domain konfigurieren**
@@ -81,6 +85,21 @@ Der Healthcheck:
 
 ## Troubleshooting
 
+### 502 Bad Gateway Error
+**Symptom:** Container läuft, Healthcheck ist OK, aber Browser zeigt 502 Error
+
+**Ursache:** Traefik weiß nicht, auf welchen Port geroutet werden soll
+
+**Lösung:**
+- Die `docker-compose.yml` enthält jetzt die notwendigen Traefik-Labels:
+  ```yaml
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.mini-qr.loadbalancer.server.port=8080"
+  ```
+- Nach dem Update: Redeploy in Coolify durchführen
+- Alternative: In Coolify UI den Port manuell auf 8080 setzen
+
 ### Container startet nicht
 - Prüfe die Build-Logs in Coolify
 - Stelle sicher, dass alle Build-Args korrekt gesetzt sind
@@ -89,11 +108,13 @@ Der Healthcheck:
 - Überprüfe, ob der Container auf Port 8080 lauscht
 - Prüfe die Container-Logs für Fehler
 - Stelle sicher, dass `serve` korrekt startet
+- Warte 40 Sekunden (start_period) nach Container-Start
 
 ### Routing-Probleme
 - Prüfe die Coolify Domain-Konfiguration
 - Stelle sicher, dass der richtige Port (8080) konfiguriert ist
-- Überprüfe die Traefik-Labels in Coolify
+- Überprüfe die Traefik-Labels in den Container-Details
+- Prüfe Traefik-Logs in Coolify für Routing-Fehler
 
 ## Netzwerk
 
