@@ -17,12 +17,12 @@ services:
         - VITE_FRAME_PRESET=${FRAME_PRESET:-}
         - VITE_FRAME_PRESETS=${FRAME_PRESETS:-}
         - VITE_DISABLE_LOCAL_STORAGE=${DISABLE_LOCAL_STORAGE:-false}
-    ports:
-      - "8080:8080"
-    labels:
-      # Coolify/Traefik labels for routing
-      - "traefik.enable=true"
-      - "traefik.http.services.mini-qr.loadbalancer.server.port=8080"
+    # Use expose instead of ports to keep the port internal to Docker network
+    # Coolify's proxy will handle external access via domain configuration
+    expose:
+      - "8080"
+    # Labels will be automatically added by Coolify based on UI configuration
+    # Or you can define custom Caddy labels here if needed
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 30s

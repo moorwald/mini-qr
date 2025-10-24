@@ -7,9 +7,9 @@ Diese Anleitung beschreibt, wie Mini-QR auf Coolify deployed wird.
 Die `docker-compose.yml` wurde für Coolify optimiert:
 
 ### 1. Nginx-Proxy entfernt
-- **Grund**: Coolify verwendet bereits Traefik als Reverse Proxy
+- **Grund**: Coolify verwendet bereits Caddy als Reverse Proxy
 - Der separate `nginx-proxy` Service ist nicht mehr notwendig
-- Das Routing wird direkt durch Coolify/Traefik übernommen
+- Das Routing wird direkt durch Coolify/Caddy übernommen
 
 ### 2. Healthcheck hinzugefügt
 ```yaml
@@ -22,8 +22,9 @@ healthcheck:
 ```
 
 ### 3. Port-Exposition
-- Port 8080 wird direkt exponiert
-- Coolify leitet den Traffic über seinen Reverse Proxy weiter
+- Port 8080 wird mit `expose` im Docker-Netzwerk verfügbar gemacht
+- **NICHT** mit `ports` exponiert, um direkte öffentliche Zugriffe zu vermeiden
+- Coolify's Caddy-Proxy leitet Traffic basierend auf der Domain-Konfiguration weiter
 
 ### 4. Curl installiert
 - Das Dockerfile installiert nun `curl` für den Healthcheck
@@ -58,22 +59,34 @@ healthcheck:
    DISABLE_LOCAL_STORAGE=false   # LocalStorage aktivieren
    ```
 
-3. **Domain konfigurieren**
-   - Setze deine gewünschte Domain in Coolify
+3. **Domain und Port konfigurieren** ⚠️ **WICHTIG!**
+
+   Mini-QR läuft auf **Port 8080**. Du musst Coolify mitteilen, auf welchen Port geroutet werden soll:
+
+   **Option A: Domain mit Port (Empfohlen)**
+   - Im Domain-Feld: `deine-domain.com:8080`
+   - Beispiel: `qr.tools.moorwald.com:8080`
+
+   **Option B: Separates Port-Feld**
+   - Im Domain-Feld: `deine-domain.com`
+   - Im Port-Feld: `8080`
+
    - Coolify konfiguriert automatisch SSL/TLS mit Let's Encrypt
+   - Die Domain wird über HTTPS erreichbar sein
 
 4. **Deploy starten**
    - Coolify baut das Image und startet den Container
-   - Der Healthcheck überwacht die Container-Gesundheit
-   - Bei erfolgreicher Healthcheck wird Traffic weitergeleitet
+   - Der Healthcheck überwacht die Container-Gesundheit (~40 Sekunden Start-Zeit)
+   - Caddy-Proxy routet Traffic automatisch zur Anwendung
+   - Nach erfolgreicher Healthcheck ist die App unter der Domain erreichbar
 
 ## BASE_PATH Konfiguration
 
 **Wichtig**: Der `BASE_PATH` wurde von `/mini-qr/` auf `/` geändert.
 
-- **Grund**: Coolify's Traefik übernimmt das Routing
-- Falls ein Subpath gewünscht ist, kann dieser über Coolify's Routing-Konfiguration gesetzt werden
-- Alternativ: `BASE_PATH` Umgebungsvariable in Coolify anpassen
+- **Grund**: Coolify's Caddy-Proxy übernimmt das Routing
+- Die App wird direkt unter der Root-Domain erreichbar sein
+- Falls ein Subpath gewünscht ist: `BASE_PATH` Umgebungsvariable in Coolify anpassen
 
 ## Healthcheck-Details
 
@@ -88,17 +101,25 @@ Der Healthcheck:
 ### 502 Bad Gateway Error
 **Symptom:** Container läuft, Healthcheck ist OK, aber Browser zeigt 502 Error
 
-**Ursache:** Traefik weiß nicht, auf welchen Port geroutet werden soll
+**Ursache:** Coolify's Caddy-Proxy weiß nicht, auf welchen Port geroutet werden soll
 
 **Lösung:**
-- Die `docker-compose.yml` enthält jetzt die notwendigen Traefik-Labels:
-  ```yaml
-  labels:
-    - "traefik.enable=true"
-    - "traefik.http.services.mini-qr.loadbalancer.server.port=8080"
-  ```
-- Nach dem Update: Redeploy in Coolify durchführen
-- Alternative: In Coolify UI den Port manuell auf 8080 setzen
+
+1. **Port in Coolify UI konfigurieren** (Schnellste Lösung)
+   - Gehe zu deinem Service in Coolify
+   - Ändere die Domain zu: `deine-domain.com:8080`
+   - Oder trage im Port-Feld `8080` ein
+   - Speichern und warten (~30 Sekunden)
+
+2. **Wenn das nicht hilft:**
+   - Redeploy durchführen
+   - Container-Logs in Coolify prüfen
+   - Caddy-Proxy-Logs prüfen (unter "Proxy" in Coolify)
+
+**Technischer Hintergrund:**
+- Coolify verwendet **Caddy docker-proxy**, nicht Traefik
+- Die `docker-compose.yml` nutzt `expose` statt `ports`
+- Caddy benötigt die Port-Information aus der Domain-Konfiguration
 
 ### Container startet nicht
 - Prüfe die Build-Logs in Coolify
@@ -111,10 +132,11 @@ Der Healthcheck:
 - Warte 40 Sekunden (start_period) nach Container-Start
 
 ### Routing-Probleme
-- Prüfe die Coolify Domain-Konfiguration
+- Prüfe die Coolify Domain-Konfiguration (Domain-Feld muss `:8080` enthalten)
 - Stelle sicher, dass der richtige Port (8080) konfiguriert ist
-- Überprüfe die Traefik-Labels in den Container-Details
-- Prüfe Traefik-Logs in Coolify für Routing-Fehler
+- Überprüfe ob der Container im gleichen Docker-Netzwerk wie Caddy läuft
+- Prüfe Caddy-Proxy-Logs in Coolify für Routing-Fehler
+- Test: `curl http://localhost:8080` auf dem Server sollte die App anzeigen
 
 ## Netzwerk
 
